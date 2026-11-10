@@ -73,8 +73,9 @@ Ergebnis: `publish\RAL_BG-Generator.exe` (ca. 150 MB, keine Runtime-Installation
    Verknüpfung auf `Rippenblech_Pulver.asm` wird auf die neue Baugruppe **umgestellt**, die
    Ansichten werden aktualisiert. Anschließend wird geprüft, ob die (einzige) ISO-Ansicht noch
    horizontal zentriert ist und dieselbe Breite hat wie in der Vorlage (Seitenbreite); weicht
-   sie ab, werden Maßstab und Lage korrigiert. Die Zeichnung wird gespeichert und sofort
-   geschlossen.
+   sie ab, werden Maßstab und Lage korrigiert. Unmittelbar vor dem Speichern werden alle
+   Ansichten auf allen Blättern geprüft und veraltete aktualisiert. Erst dann wird die
+   Zeichnung gespeichert und sofort geschlossen.
 
 ### Namensregel
 
@@ -180,7 +181,8 @@ Signaturen vorab **gegen die Type Library von Solid Edge 2026 verifiziert** (Ref
 | Neue Zeichnung aus Vorlage | `Documents.Add("SolidEdge.DraftDocument", TemplateDoc)` |
 | Verknüpfung finden | `DraftDocument.ModelLinks` → `Item`, `ModelLink.FileName` |
 | Verknüpfung umstellen | `ModelLink.ChangeSource(String FullPath, [Object Member])` |
-| Ansichten aktualisieren | `ModelLink.UpdateViews()`, Fallback `DraftDocument.UpdateAll(Boolean bForceUpdate)` |
+| Ansichten aktualisieren | `ModelLink.ForceUpdateViews()`, Fallback `DraftDocument.UpdateAll(Boolean bForceUpdate)` |
+| Vor dem Speichern | je Ansicht `DrawingView.IsUpToDate` → `Update()`, notfalls `ForceUpdate()`, dann `Application.DoIdle()` |
 | ISO-Ansicht finden | `DraftDocument.Sheets` → `Sheet.DrawingViews`, `DrawingView.DrawingViewType` (`igIsometricView = 2`), sonst `DrawingView.ViewOrientation(ref ×7)` |
 | Blattgröße | `Sheet.SheetSetup.SheetWidth` / `SheetHeight` (Meter) |
 | Prüfen/Korrigieren | `DrawingView.Range(ref ×4)`, `ScaleFactor`, `GetOrigin`/`SetOrigin` |
@@ -188,7 +190,8 @@ Signaturen vorab **gegen die Type Library von Solid Edge 2026 verifiziert** (Ref
 Die Zeichnungsvorlage muss die Verknüpfung auf `Rippenblech_Pulver.asm` enthalten (Konstante
 `TemplateAssemblyFileName` in `SolidEdgeService.cs`); fehlt sie, schlägt die Zeichnung mit
 klarer Meldung fehl. Wird nicht genau eine ISO-Ansicht gefunden, entfällt die Lageprüfung —
-ein Hinweis steht im Protokoll.
+ein Hinweis steht im Protokoll. Meldet eine Ansicht auch nach `ForceUpdate()` noch „veraltet“,
+wird die Zeichnung trotzdem gespeichert; die betroffenen Ansichten stehen im Protokoll.
 
 `Marshal.GetActiveObject` existiert in .NET 8 **nicht mehr** (nur .NET Framework). Der Zugriff
 auf eine laufende Instanz erfolgt daher über `ole32!CLSIDFromProgID` +

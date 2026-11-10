@@ -707,6 +707,10 @@ public sealed class SolidEdgeService : ISolidEdgeService
                     EnsureIsoViewLayout(iso.View, sheetWidth, templateExtent);
                 }
 
+                // Letzte Kontrolle direkt vor dem Speichern - auch nach Massstab/Lage-Korrektur.
+                EnsureAllViewsUpToDate(scope, (object)document);
+                ComRetry.Execute(() => { application.DoIdle(); });
+
                 SaveAs(document, targetPath);
             }
             finally
@@ -802,7 +806,10 @@ public sealed class SolidEdgeService : ISolidEdgeService
         }
     }
 
-    /// <summary>Aktualisiert alle Ansichten der umgestellten Verknuepfung; Fallback: ganze Zeichnung.</summary>
+    /// <summary>
+    /// Aktualisiert alle Ansichten der umgestellten Verknuepfung erzwungen - UpdateViews allein
+    /// liess Ansichten in der gespeicherten Zeichnung veraltet. Fallback: ganze Zeichnung.
+    /// </summary>
     private void UpdateDrawingViews(object documentObject, object modelLinkObject)
     {
         dynamic document = documentObject;
@@ -810,11 +817,11 @@ public sealed class SolidEdgeService : ISolidEdgeService
 
         try
         {
-            ComRetry.Execute(() => { modelLink.UpdateViews(); });
+            ComRetry.Execute(() => { modelLink.ForceUpdateViews(); });
         }
         catch (Exception ex) when (ComErrors.IsComFailure(ex))
         {
-            DiagnosticLog?.Invoke("Hinweis: ModelLink.UpdateViews fehlgeschlagen - gesamte Zeichnung wird aktualisiert.");
+            DiagnosticLog?.Invoke("Hinweis: ModelLink.ForceUpdateViews fehlgeschlagen - gesamte Zeichnung wird aktualisiert.");
 
             try
             {
@@ -827,6 +834,117 @@ public sealed class SolidEdgeService : ISolidEdgeService
                     updateError);
             }
         }
+    }
+
+    /// <summary>
+    /// Prueft alle Ansichten auf allen Blaettern: veraltete werden mit Update(), notfalls mit
+    /// ForceUpdate() aktualisiert. Bleibt danach eine veraltet, steht ein Hinweis im Protokoll
+    /// und die Zeichnung wird trotzdem gespeichert.
+    /// </summary>
+    private void EnsureAllViewsUpToDate(ComScope scope, object documentObject)
+    {
+        dynamic document = documentObject;
+        dynamic sheets = scope.Track(ComRetry.Execute(() => (object)document.Sheets));
+        var sheetCount = ComRetry.Execute(() => (int)sheets.Count);
+
+        var outdated = new List<string>();
+
+        for (var s = 1; s <= sheetCount; s++)
+        {
+            var sheetIndex = s;
+            dynamic sheet = scope.Track(ComRetry.Execute(() => (object)sheets.Item(sheetIndex)));
+            dynamic views = scope.Track(ComRetry.Execute(() => (object)sheet.DrawingViews));
+            var viewCount = ComRetry.Execute(() => (int)views.Count);
+
+            for (var v = 1; v <= viewCount; v++)
+            {
+                var viewIndex = v;
+                object viewObject = scope.Track(ComRetry.Execute(() => (object)views.Item(viewIndex)));
+
+                if (IsUpToDate(viewObject))
+                {
+                    continue;
+                }
+
+                TryUpdate(viewObject, force: false);
+
+                if (!IsUpToDate(viewObject))
+                {
+                    TryUpdate(viewObject, force: true);
+                }
+
+                if (!IsUpToDate(viewObject))
+                {
+                    outdated.Add(DescribeView(viewObject, s, v));
+                }
+            }
+        }
+
+        if (outdated.Count > 0)
+        {
+            DiagnosticLog?.Invoke(
+                "Hinweis: Ansicht(en) trotz Aktualisierung als veraltet gemeldet, Zeichnung wird trotzdem gespeichert: " +
+                string.Join(", ", outdated));
+        }
+    }
+
+    private static bool IsUpToDate(object viewObject)
+    {
+        dynamic view = viewObject;
+
+        try
+        {
+            return ComRetry.Execute(() => (bool)view.IsUpToDate);
+        }
+        catch (Exception ex) when (ComErrors.IsComFailure(ex))
+        {
+            // Nicht lesbar: lieber einmal zu oft aktualisieren.
+            return false;
+        }
+    }
+
+    private static void TryUpdate(object viewObject, bool force)
+    {
+        dynamic view = viewObject;
+
+        try
+        {
+            if (force)
+            {
+                ComRetry.Execute(() => { view.ForceUpdate(); });
+            }
+            else
+            {
+                ComRetry.Execute(() => { view.Update(); });
+            }
+        }
+        catch (Exception ex) when (ComErrors.IsComFailure(ex))
+        {
+            // Ergebnis prueft der Aufrufer ueber IsUpToDate.
+        }
+    }
+
+    private static string DescribeView(object viewObject, int sheetIndex, int viewIndex)
+    {
+        dynamic view = viewObject;
+
+        try
+        {
+            var name = ComRetry.Execute(() => (string?)view.Name);
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name + " (Blatt " + sheetIndex + ")";
+            }
+        }
+        catch (Exception)
+        {
+            // Name ist in der Type Library parametrisiert (get_Name(Object)) und ueber
+            // IDispatch nicht immer lesbar - der Name dient nur dem Protokoll, also
+            // unten mit der Position weiter.
+        }
+
+        return "Ansicht " + viewIndex + " (Blatt " + sheetIndex + ")";
     }
 
     /// <summary>
