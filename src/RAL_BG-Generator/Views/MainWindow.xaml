@@ -135,9 +135,12 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -160,7 +163,37 @@
                         Margin="8,0,0,0"
                         Command="{Binding ClearPowderPartCommand}" />
 
-                <TextBlock Grid.Row="1" Grid.ColumnSpan="3"
+                <TextBlock Grid.Row="0" Grid.Column="3"
+                           Text="Menge:"
+                           VerticalAlignment="Center"
+                           Margin="16,0,6,0" />
+
+                <TextBox x:Name="PowderQuantityBox"
+                         Grid.Row="0" Grid.Column="4"
+                         Width="70"
+                         MaxLength="6"
+                         Text="{Binding PowderQuantityText, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding CanEditPowderQuantity}"
+                         InputMethod.IsInputMethodEnabled="False"
+                         PreviewTextInput="OnQuantityPreviewTextInput"
+                         PreviewKeyDown="OnQuantityPreviewKeyDown"
+                         DataObject.Pasting="OnQuantityPasting"
+                         HorizontalContentAlignment="Right"
+                         VerticalContentAlignment="Center"
+                         Padding="4,3"
+                         ToolTip="Stuecklistenmenge der Pulverdatei je Baugruppe - ganze Zahl groesser 0">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsPowderQuantityValid}" Value="False">
+                                    <Setter Property="BorderBrush" Value="#C42020" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="5"
                            Text="{Binding PowderStatus}"
                            TextWrapping="Wrap"
                            Margin="0,6,0,0">
@@ -173,6 +206,22 @@
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsPowderWarning}" Value="True">
                                     <Setter Property="Foreground" Value="#C05A00" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <TextBlock Grid.Row="2" Grid.ColumnSpan="5"
+                           Text="{Binding PowderQuantityStatus}"
+                           Foreground="#C42020"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsPowderQuantityValid}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

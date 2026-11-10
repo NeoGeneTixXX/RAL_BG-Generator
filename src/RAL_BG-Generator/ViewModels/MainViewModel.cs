@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -78,6 +79,16 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPowderWarning;
 
+    /// <summary>Menge der Pulverdatei als Text, damit auch ungueltige Eingaben angezeigt werden.</summary>
+    [ObservableProperty]
+    private string _powderQuantityText = "1";
+
+    [ObservableProperty]
+    private bool _isPowderQuantityValid = true;
+
+    [ObservableProperty]
+    private string _powderQuantityStatus = string.Empty;
+
     [ObservableProperty]
     private string _faceStyleFilter = string.Empty;
 
@@ -122,6 +133,12 @@ public sealed partial class MainViewModel : ObservableObject
     private string? EffectivePowderPartPath =>
         string.IsNullOrWhiteSpace(PowderPartPath) ? null : PowderPartPath;
 
+    /// <summary>True, wenn eine Pulverdatei gewaehlt ist - nur dann ist die Menge relevant.</summary>
+    public bool HasPowderPart => EffectivePowderPartPath is not null;
+
+    /// <summary>Mengenfeld bedienbar: Pulverdatei gewaehlt und kein Lauf/Ladevorgang aktiv.</summary>
+    public bool CanEditPowderQuantity => HasPowderPart && CanInteract();
+
     // ----------------------------------------------------------------- Start
 
     public async Task InitializeAsync()
@@ -135,6 +152,8 @@ public sealed partial class MainViewModel : ObservableObject
             TemplatePath = _settings.TemplatePath;
             DrawingTemplatePath = _settings.DrawingTemplatePath;
             PowderPartPath = _settings.PowderPartPath;
+            PowderQuantityText = (_settings.PowderQuantity > 0 ? _settings.PowderQuantity : 1)
+                .ToString(CultureInfo.InvariantCulture);
             OutputFolder = _settings.OutputFolder;
             UseCustomOutputFolder = _settings.UseCustomOutputFolder;
         }
@@ -147,6 +166,7 @@ public sealed partial class MainViewModel : ObservableObject
         ValidateTemplate();
         ValidateDrawingTemplate();
         ValidatePowderPart();
+        ValidatePowderQuantity();
 
         if (!IsTemplateValid)
         {
@@ -274,8 +294,41 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnPowderPartPathChanged(string? value)
     {
+        OnPropertyChanged(nameof(HasPowderPart));
+        OnPropertyChanged(nameof(CanEditPowderQuantity));
         ValidatePowderPart();
+        ValidatePowderQuantity();
         PersistSettings();
+    }
+
+    partial void OnPowderQuantityTextChanged(string value)
+    {
+        ValidatePowderQuantity();
+
+        if (TryParsePowderQuantity(value, out var quantity))
+        {
+            _settings.PowderQuantity = quantity;
+            PersistSettings();
+        }
+    }
+
+    /// <summary>
+    /// Nur Ziffern, keine Vorzeichen, keine Trennzeichen, keine Leerzeichen - und groesser 0.
+    /// Das Textfeld laesst andere Zeichen gar nicht erst zu; die Pruefung hier ist das Netz
+    /// fuer alles, was trotzdem hineingelangt (z. B. ein leeres Feld).
+    /// </summary>
+    public static bool TryParsePowderQuantity(string? text, out int quantity) =>
+        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out quantity) && quantity > 0;
+
+    private void ValidatePowderQuantity()
+    {
+        // Ohne Pulverdatei hat die Menge keine Wirkung und sperrt den Start nicht.
+        IsPowderQuantityValid = !HasPowderPart || TryParsePowderQuantity(PowderQuantityText, out _);
+        PowderQuantityStatus = IsPowderQuantityValid
+            ? string.Empty
+            : "Menge muss eine ganze Zahl groesser 0 sein.";
+
+        StartCommand.NotifyCanExecuteChanged();
     }
 
     private void ValidatePowderPart()
@@ -494,6 +547,7 @@ public sealed partial class MainViewModel : ObservableObject
         var drawingTemplatePath = DrawingTemplatePath!;
         var styleName = SelectedFaceStyle!;
         var powderPartPath = EffectivePowderPartPath;
+        TryParsePowderQuantity(PowderQuantityText, out var powderQuantity);
         var files = PartFiles.ToList();
 
         _cancellation = new CancellationTokenSource();
@@ -515,7 +569,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 AppendLog(
                     LogLevel.Info,
-                    "Pulverdatei je Baugruppe: " + Path.GetFileName(powderPartPath));
+                    "Pulverdatei je Baugruppe: " + Path.GetFileName(powderPartPath) + ", Menge " + powderQuantity);
             }
 
             var connection = await _solidEdgeService.ConnectAsync(allowStart: true);
@@ -568,7 +622,8 @@ public sealed partial class MainViewModel : ObservableObject
                         file.FullPath,
                         targetPath,
                         styleName,
-                        powderPartPath);
+                        powderPartPath,
+                        powderQuantity);
 
                     AppendLog(LogLevel.Success, $"Erstellt: {Path.GetFileName(targetPath)}");
                 }
@@ -655,6 +710,7 @@ public sealed partial class MainViewModel : ObservableObject
         && IsTemplateValid
         && IsDrawingTemplateValid
         && IsPowderValid
+        && IsPowderQuantityValid
         && !string.IsNullOrWhiteSpace(SelectedFaceStyle)
         && PartFiles.Count > 0;
 
@@ -667,6 +723,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void NotifyCommandStates()
     {
+        OnPropertyChanged(nameof(CanEditPowderQuantity));
         StartCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
         BrowseTemplateCommand.NotifyCanExecuteChanged();

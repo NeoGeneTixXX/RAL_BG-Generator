@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
 using RalBgGenerator.ViewModels;
 
@@ -59,6 +60,35 @@ public partial class MainWindow : Window
 
         LogList.ScrollIntoView(LogList.Items[^1]);
     }
+
+    // ----------------------------------------------------------------- Mengenfeld
+
+    /// <summary>Laesst nur Ziffern 0-9 durch - kein Komma, Punkt, Vorzeichen oder Buchstabe.</summary>
+    private void OnQuantityPreviewTextInput(object sender, TextCompositionEventArgs e) =>
+        e.Handled = !IsDigitsOnly(e.Text);
+
+    /// <summary>Leerzeichen kommt nicht ueber PreviewTextInput und wird hier abgefangen.</summary>
+    private void OnQuantityPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space)
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Einfuegen nur, wenn der eingefuegte Text ausschliesslich aus Ziffern besteht.</summary>
+    private void OnQuantityPasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (e.DataObject.GetData(DataFormats.UnicodeText) is not string text || !IsDigitsOnly(text))
+        {
+            e.CancelCommand();
+        }
+    }
+
+    private static bool IsDigitsOnly(string text) =>
+        text.Length > 0 && text.All(character => character is >= '0' and <= '9');
+
+    // ----------------------------------------------------------------- Drag and Drop
 
     private void OnDragOver(object sender, DragEventArgs e)
     {

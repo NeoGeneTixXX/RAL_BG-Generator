@@ -33,12 +33,17 @@ public interface ISolidEdgeService : IDisposable
     /// Optionale Pulverdatei (.par), die zusaetzlich im Ursprung fixiert eingefuegt wird.
     /// Sie bekommt keinen Face Style; null/leer = keine Pulverdatei.
     /// </param>
+    /// <param name="powderQuantity">
+    /// Stuecklistenmenge der Pulverdatei (Occurrence.Quantity), ganze Zahl groesser 0.
+    /// Ohne Pulverdatei ohne Wirkung.
+    /// </param>
     Task CreateAssemblyAsync(
         string templatePath,
         string partPath,
         string targetPath,
         string styleName,
-        string? powderPartPath);
+        string? powderPartPath,
+        int powderQuantity);
 
     /// <summary>
     /// Erzeugt aus der Zeichnungsvorlage eine Zeichnung der (bereits gespeicherten) Baugruppe:

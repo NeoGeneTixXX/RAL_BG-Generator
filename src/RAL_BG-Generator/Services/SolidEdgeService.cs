@@ -101,9 +101,10 @@ public sealed class SolidEdgeService : ISolidEdgeService
         string partPath,
         string targetPath,
         string styleName,
-        string? powderPartPath) =>
+        string? powderPartPath,
+        int powderQuantity) =>
         _staRunner.InvokeAsync(
-            () => CreateAssemblyCore(templatePath, partPath, targetPath, styleName, powderPartPath));
+            () => CreateAssemblyCore(templatePath, partPath, targetPath, styleName, powderPartPath, powderQuantity));
 
     public Task CreateDrawingAsync(string drawingTemplatePath, string assemblyPath, string targetPath) =>
         _staRunner.InvokeAsync(() => CreateDrawingCore(drawingTemplatePath, assemblyPath, targetPath));
@@ -330,9 +331,15 @@ public sealed class SolidEdgeService : ISolidEdgeService
         string partPath,
         string targetPath,
         string styleName,
-        string? powderPartPath)
+        string? powderPartPath,
+        int powderQuantity)
     {
         EnsureConnected();
+
+        if (!string.IsNullOrWhiteSpace(powderPartPath) && powderQuantity < 1)
+        {
+            throw new SolidEdgeException("Die Menge der Pulverdatei muss eine ganze Zahl groesser 0 sein.");
+        }
 
         if (!File.Exists(partPath))
         {
@@ -358,7 +365,7 @@ public sealed class SolidEdgeService : ISolidEdgeService
 
                 if (!string.IsNullOrWhiteSpace(powderPartPath))
                 {
-                    AddPowderPart(scope, document, occurrences, powderPartPath);
+                    AddPowderPart(scope, document, occurrences, powderPartPath, powderQuantity);
                 }
 
                 SaveAs(document, targetPath);
@@ -413,9 +420,10 @@ public sealed class SolidEdgeService : ISolidEdgeService
     /// <summary>
     /// Legt die Pulverdatei zusaetzlich in die Baugruppe: ebenfalls im Ursprung fixiert,
     /// aber ohne Face Style. Sie wird nach dem eigentlichen Teil eingefuegt, damit sie in
-    /// der Stueckliste hinter ihm steht.
+    /// der Stueckliste hinter ihm steht. Ihre Stuecklistenmenge wird auf
+    /// <paramref name="quantity"/> gesetzt.
     /// </summary>
-    private void AddPowderPart(ComScope scope, dynamic document, dynamic occurrences, string powderPartPath)
+    private void AddPowderPart(ComScope scope, dynamic document, dynamic occurrences, string powderPartPath, int quantity)
     {
         if (!File.Exists(powderPartPath))
         {
@@ -425,7 +433,41 @@ public sealed class SolidEdgeService : ISolidEdgeService
         dynamic occurrence = scope.Track(AddAtOrigin(occurrences, powderPartPath));
 
         GroundOccurrence(scope, document, occurrence);
+        SetQuantity(occurrence, quantity);
         HideCoordinateSystems(scope, document);
+    }
+
+    /// <summary>
+    /// Setzt die normale Stuecklistenmenge (Occurrence.Quantity, Int32) und liest sie zur
+    /// Kontrolle zurueck. Weicht sie ab, wird die Baugruppe nicht gespeichert.
+    /// </summary>
+    private static void SetQuantity(dynamic occurrence, int quantity)
+    {
+        try
+        {
+            ComRetry.Execute(() => { occurrence.Quantity = quantity; });
+        }
+        catch (Exception ex) when (ComErrors.IsComFailure(ex))
+        {
+            throw new SolidEdgeException("Die Menge der Pulverdatei liess sich nicht auf " + quantity + " setzen.", ex);
+        }
+
+        int actual;
+
+        try
+        {
+            actual = ComRetry.Execute(() => (int)occurrence.Quantity);
+        }
+        catch (Exception ex) when (ComErrors.IsComFailure(ex))
+        {
+            throw new SolidEdgeException("Die Menge der Pulverdatei liess sich nicht zuruecklesen.", ex);
+        }
+
+        if (actual != quantity)
+        {
+            throw new SolidEdgeException(
+                "Die Menge der Pulverdatei ist " + actual + " statt " + quantity + ".");
+        }
     }
 
     /// <summary>

@@ -21,6 +21,9 @@ public sealed class AppSettings
     /// </summary>
     public string? PowderPartPath { get; set; }
 
+    /// <summary>Stuecklistenmenge der Pulverdatei je Baugruppe; ganze Zahl groesser 0.</summary>
+    public int PowderQuantity { get; set; } = 1;
+
     /// <summary>Abweichender Zielordner; leer = Ordner der jeweiligen Quelldatei.</summary>
     public string? OutputFolder { get; set; }
 

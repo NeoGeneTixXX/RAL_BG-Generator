@@ -57,7 +57,11 @@ Ergebnis: `publish\RAL_BG-Generator.exe` (ca. 150 MB, keine Runtime-Installation
    zusätzlich am Ursprung fixiert eingefügt wird. Wird ebenfalls gespeichert und bei jedem
    Start wieder vorbelegt. Ohne Auswahl läuft der Batch ganz normal, nur ohne dieses Teil.
    Ein gesetzter, aber ungültiger Pfad sperrt den Start — sonst entstünden Baugruppen ohne
-   den Stücklisteneintrag.
+   den Stücklisteneintrag. Im Feld **Menge** daneben steht die Stücklistenmenge der
+   Pulverdatei je Baugruppe (Standard 1, wird gespeichert). Erlaubt sind nur ganze Zahlen
+   größer 0: Komma, Punkt, Vorzeichen, Buchstaben und Leerzeichen lassen sich weder tippen
+   noch einfügen; ein leeres Feld oder 0 sperrt den Start. Ohne Pulverdatei ist das Feld
+   ausgegraut.
 4. **Farbe wählen** — die Face Styles werden aus der Vorlage gelesen. Das Suchfeld filtert die
    Liste (Vorlagen enthalten oft über 100 Styles).
 5. **Teile wählen** — Mehrfachauswahl per Dialog oder Drag and Drop ins Fenster.
@@ -169,6 +173,7 @@ Signaturen vorab **gegen die Type Library von Solid Edge 2026 verifiziert** (Ref
 | Ursprung ausblenden | `AssemblyDocument.CoordinateSystems` → `CoordinateSystem.Visible` (best effort) |
 | Farbe | `Occurrence.FaceStyle` (Object, get/set), `Occurrence.Style` (String, get/set) |
 | Style-Name | `FaceStyle.StyleName` — **es gibt kein `FaceStyle.Name`** |
+| Menge der Pulverdatei | `Occurrence.Quantity` (Int32, get/set) — nicht `NongraphicQuantity` (Double) |
 | Speichern | `AssemblyDocument.SaveAs(String NewName, …)` |
 | Schließen | `AssemblyDocument.Close(Object SaveChanges, …)` |
 | Schließen abschließen | `Application.DoIdle()` (vgl. `Documents.CloseDocument(…, Object DoIdle)`) |
@@ -205,6 +210,9 @@ auf eine laufende Instanz erfolgt daher über `ole32!CLSIDFromProgID` +
   angedockt: kein `Quit` und keine Änderung an der Sichtbarkeit. Nur eine selbst gestartete
   Instanz wird sichtbar geschaltet — eine Umschaltmöglichkeit dafür gibt es bewusst nicht,
   weil sie in der Praxis keinen sichtbaren Unterschied gemacht hat.
+- **Die Menge der Pulverdatei wird geprüft.** Nach dem Setzen wird `Occurrence.Quantity`
+  zurückgelesen; weicht der Wert ab, schlägt die Datei fehl, statt mit falscher Menge zu
+  speichern.
 - **Die Pulverdatei bekommt keine Farbe.** Der Face Style gilt nur für das eigentliche Teil.
   Sie wird nach ihm eingefügt, steht also in der Stückliste hinter ihm, und die
   Koordinatensysteme der neuen Baugruppe werden ausgeblendet, damit an ihrer Stelle kein
