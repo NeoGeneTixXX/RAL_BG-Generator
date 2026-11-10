@@ -678,6 +678,10 @@ public sealed class SolidEdgeService : ISolidEdgeService
             var documentObject = ComRetry.Execute(() => (object)documents.Add(DraftDocumentProgId, drawingTemplatePath));
             dynamic document = scope.Track(documentObject);
 
+            // Aktueller Arbeitsschritt - landet in der Fehlermeldung, damit das Protokoll zeigt,
+            // welcher Solid-Edge-Aufruf gescheitert ist.
+            var step = "Verknuepfung und ISO-Ansicht der Vorlage suchen";
+
             try
             {
                 // Die Vorlage bringt Verknuepfung und Ansichten bereits mit. Es wird nichts
@@ -696,7 +700,10 @@ public sealed class SolidEdgeService : ISolidEdgeService
                     (sheetWidth, _) = ReadSheetSize(scope, found.Sheet);
                 }
 
+                step = "Verknuepfung auf die neue Baugruppe umstellen";
                 ChangeModelLinkSource(modelLink, assemblyPath);
+
+                step = "Ansichten aktualisieren";
                 UpdateDrawingViews((object)document, modelLink);
 
                 // Ansichtsgrafik aufbauen lassen, damit Range verlaessliche Werte liefert.
@@ -704,14 +711,24 @@ public sealed class SolidEdgeService : ISolidEdgeService
 
                 if (isoView is { } iso)
                 {
+                    step = "ISO-Ansicht skalieren und zentrieren";
                     EnsureIsoViewLayout(iso.View, sheetWidth, templateExtent);
                 }
 
                 // Letzte Kontrolle direkt vor dem Speichern - auch nach Massstab/Lage-Korrektur.
+                step = "Ansichten vor dem Speichern pruefen";
                 EnsureAllViewsUpToDate(scope, (object)document);
                 ComRetry.Execute(() => { application.DoIdle(); });
 
+                step = "Zeichnung speichern";
                 SaveAs(document, targetPath);
+            }
+            catch (Exception ex) when (ex is not SolidEdgeException)
+            {
+                throw new SolidEdgeException(
+                    "Schritt '" + step + "': " + ex.Message +
+                    " [" + ex.GetType().Name + ", 0x" + ex.HResult.ToString("X8") + "]",
+                    ex);
             }
             finally
             {
