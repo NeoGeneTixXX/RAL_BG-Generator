@@ -90,6 +90,15 @@ public sealed partial class MainViewModel : ObservableObject
     private string _powderQuantityStatus = string.Empty;
 
     [ObservableProperty]
+    private string? _powderQuantityCsvPath;
+
+    [ObservableProperty]
+    private string _powderQuantityCsvStatus = string.Empty;
+
+    /// <summary>Gelesene Mengen-CSV; null, wenn keine gewaehlt ist.</summary>
+    private PowderQuantityCsv? _powderQuantityCsv;
+
+    [ObservableProperty]
     private string _faceStyleFilter = string.Empty;
 
     [ObservableProperty]
@@ -136,8 +145,16 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>True, wenn eine Pulverdatei gewaehlt ist - nur dann ist die Menge relevant.</summary>
     public bool HasPowderPart => EffectivePowderPartPath is not null;
 
-    /// <summary>Mengenfeld bedienbar: Pulverdatei gewaehlt und kein Lauf/Ladevorgang aktiv.</summary>
-    public bool CanEditPowderQuantity => HasPowderPart && CanInteract();
+    /// <summary>
+    /// Ab zwei Dateien in der Liste kommen die Mengen aus der CSV, nicht aus dem Textfeld.
+    /// </summary>
+    public bool UsesPowderQuantityCsv => HasPowderPart && PartFiles.Count > 1;
+
+    /// <summary>Mengenfeld bedienbar: Pulverdatei, hoechstens eine Datei, kein Lauf/Ladevorgang.</summary>
+    public bool CanEditPowderQuantity => HasPowderPart && !UsesPowderQuantityCsv && CanInteract();
+
+    /// <summary>CSV-Auswahl bedienbar: Pulverdatei, mehrere Dateien, kein Lauf/Ladevorgang.</summary>
+    public bool CanEditPowderQuantityCsv => UsesPowderQuantityCsv && CanInteract();
 
     // ----------------------------------------------------------------- Start
 
@@ -154,6 +171,7 @@ public sealed partial class MainViewModel : ObservableObject
             PowderPartPath = _settings.PowderPartPath;
             PowderQuantityText = (_settings.PowderQuantity > 0 ? _settings.PowderQuantity : 1)
                 .ToString(CultureInfo.InvariantCulture);
+            PowderQuantityCsvPath = _settings.PowderQuantityCsvPath;
             OutputFolder = _settings.OutputFolder;
             UseCustomOutputFolder = _settings.UseCustomOutputFolder;
         }
@@ -294,11 +312,41 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnPowderPartPathChanged(string? value)
     {
-        OnPropertyChanged(nameof(HasPowderPart));
-        OnPropertyChanged(nameof(CanEditPowderQuantity));
+        NotifyPowderQuantityModeChanged();
         ValidatePowderPart();
         ValidatePowderQuantity();
         PersistSettings();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditPowderQuantityCsv))]
+    private void BrowsePowderQuantityCsv()
+    {
+        var selected = _dialogService.PickPowderQuantityCsv(PowderQuantityCsvPath);
+
+        if (selected is not null)
+        {
+            PowderQuantityCsvPath = selected;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditPowderQuantityCsv))]
+    private void ClearPowderQuantityCsv() => PowderQuantityCsvPath = null;
+
+    partial void OnPowderQuantityCsvPathChanged(string? value)
+    {
+        ValidatePowderQuantity();
+        PersistSettings();
+    }
+
+    /// <summary>Haengt an Pulverdatei, Dateianzahl und Laufzustand - alles zusammen melden.</summary>
+    private void NotifyPowderQuantityModeChanged()
+    {
+        OnPropertyChanged(nameof(HasPowderPart));
+        OnPropertyChanged(nameof(UsesPowderQuantityCsv));
+        OnPropertyChanged(nameof(CanEditPowderQuantity));
+        OnPropertyChanged(nameof(CanEditPowderQuantityCsv));
+        BrowsePowderQuantityCsvCommand.NotifyCanExecuteChanged();
+        ClearPowderQuantityCsvCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnPowderQuantityTextChanged(string value)
@@ -320,15 +368,84 @@ public sealed partial class MainViewModel : ObservableObject
     public static bool TryParsePowderQuantity(string? text, out int quantity) =>
         int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out quantity) && quantity > 0;
 
+    /// <summary>
+    /// Eine Datei: Textfeld. Mehrere Dateien: Mengen-CSV, die zu jeder Datei der Liste
+    /// eine Menge liefern muss. Ohne Pulverdatei hat beides keine Wirkung.
+    /// </summary>
     private void ValidatePowderQuantity()
     {
-        // Ohne Pulverdatei hat die Menge keine Wirkung und sperrt den Start nicht.
-        IsPowderQuantityValid = !HasPowderPart || TryParsePowderQuantity(PowderQuantityText, out _);
-        PowderQuantityStatus = IsPowderQuantityValid
-            ? string.Empty
-            : "Menge muss eine ganze Zahl groesser 0 sein.";
+        PowderQuantityStatus = string.Empty;
+        PowderQuantityCsvStatus = string.Empty;
+
+        if (!HasPowderPart)
+        {
+            IsPowderQuantityValid = true;
+        }
+        else if (UsesPowderQuantityCsv)
+        {
+            var (isValid, message) = CheckPowderQuantityCsv();
+            IsPowderQuantityValid = isValid;
+            PowderQuantityCsvStatus = message;
+        }
+        else
+        {
+            IsPowderQuantityValid = TryParsePowderQuantity(PowderQuantityText, out _);
+
+            if (!IsPowderQuantityValid)
+            {
+                PowderQuantityStatus = "Menge muss eine ganze Zahl groesser 0 sein.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(PowderQuantityCsvPath))
+            {
+                PowderQuantityCsvStatus = "Die Mengen-CSV wird erst ab zwei Dateien in der Liste verwendet.";
+            }
+        }
 
         StartCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Liest die CSV neu (sie kann seit der Auswahl bearbeitet worden sein) und prueft, ob
+    /// jede Datei der Liste eine Menge hat.
+    /// </summary>
+    private (bool IsValid, string Message) CheckPowderQuantityCsv()
+    {
+        _powderQuantityCsv = null;
+
+        if (string.IsNullOrWhiteSpace(PowderQuantityCsvPath))
+        {
+            return (false, "Bei mehr als einer Datei ist eine Mengen-CSV (Datei;Menge) erforderlich.");
+        }
+
+        var csv = PowderQuantityCsv.Load(PowderQuantityCsvPath);
+
+        if (!csv.IsValid)
+        {
+            return (false, "Mengen-CSV fehlerhaft: " + Summarize(csv.Errors));
+        }
+
+        var missing = PartFiles
+            .Where(item => csv.Find(item.FullPath) is null)
+            .Select(item => item.FileName)
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            return (false, "Keine Menge in der CSV fuer: " + Summarize(missing));
+        }
+
+        _powderQuantityCsv = csv;
+        return (true, $"Mengen-CSV in Ordnung: alle {PartFiles.Count} Dateien haben eine Menge.");
+    }
+
+    /// <summary>Die ersten drei Eintraege, der Rest als Anzahl - der Status bleibt lesbar.</summary>
+    private static string Summarize(IReadOnlyList<string> items)
+    {
+        const int shown = 3;
+        var text = string.Join("; ", items.Take(shown));
+
+        return items.Count > shown ? text + $" (und {items.Count - shown} weitere)" : text;
     }
 
     private void ValidatePowderPart()
@@ -505,6 +622,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnPartFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        // Ab zwei Dateien wechselt die Menge vom Textfeld auf die CSV.
+        NotifyPowderQuantityModeChanged();
+        ValidatePowderQuantity();
         UpdateTargetPreviews();
         StartCommand.NotifyCanExecuteChanged();
         ClearFilesCommand.NotifyCanExecuteChanged();
@@ -547,8 +667,29 @@ public sealed partial class MainViewModel : ObservableObject
         var drawingTemplatePath = DrawingTemplatePath!;
         var styleName = SelectedFaceStyle!;
         var powderPartPath = EffectivePowderPartPath;
-        TryParsePowderQuantity(PowderQuantityText, out var powderQuantity);
         var files = PartFiles.ToList();
+        var usesCsv = UsesPowderQuantityCsv;
+        TryParsePowderQuantity(PowderQuantityText, out var singleQuantity);
+
+        // Die CSV kann seit der letzten Pruefung bearbeitet worden sein - direkt vor dem Lauf
+        // noch einmal lesen. Passt sie nicht mehr, startet der Lauf gar nicht erst.
+        PowderQuantityCsv? quantityCsv = null;
+
+        if (powderPartPath is not null && usesCsv)
+        {
+            ValidatePowderQuantity();
+
+            if (!IsPowderQuantityValid || _powderQuantityCsv is null)
+            {
+                AppendLog(LogLevel.Error, "Start abgebrochen: " + PowderQuantityCsvStatus);
+                return;
+            }
+
+            quantityCsv = _powderQuantityCsv;
+        }
+
+        int QuantityFor(PartFileItem item) =>
+            quantityCsv?.Find(item.FullPath) ?? singleQuantity;
 
         _cancellation = new CancellationTokenSource();
         var token = _cancellation.Token;
@@ -569,7 +710,10 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 AppendLog(
                     LogLevel.Info,
-                    "Pulverdatei je Baugruppe: " + Path.GetFileName(powderPartPath) + ", Menge " + powderQuantity);
+                    "Pulverdatei je Baugruppe: " + Path.GetFileName(powderPartPath) +
+                    (quantityCsv is not null
+                        ? ", Mengen aus " + Path.GetFileName(PowderQuantityCsvPath)
+                        : ", Menge " + singleQuantity));
             }
 
             var connection = await _solidEdgeService.ConnectAsync(allowStart: true);
@@ -617,6 +761,8 @@ public sealed partial class MainViewModel : ObservableObject
 
                 try
                 {
+                    var powderQuantity = QuantityFor(file);
+
                     await _solidEdgeService.CreateAssemblyAsync(
                         templatePath,
                         file.FullPath,
@@ -625,7 +771,8 @@ public sealed partial class MainViewModel : ObservableObject
                         powderPartPath,
                         powderQuantity);
 
-                    AppendLog(LogLevel.Success, $"Erstellt: {Path.GetFileName(targetPath)}");
+                    var quantityNote = powderPartPath is not null ? $" (Pulvermenge {powderQuantity})" : string.Empty;
+                    AppendLog(LogLevel.Success, $"Erstellt: {Path.GetFileName(targetPath)}{quantityNote}");
                 }
                 catch (Exception ex)
                 {
@@ -723,7 +870,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void NotifyCommandStates()
     {
-        OnPropertyChanged(nameof(CanEditPowderQuantity));
+        NotifyPowderQuantityModeChanged();
         StartCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
         BrowseTemplateCommand.NotifyCanExecuteChanged();
@@ -749,6 +896,7 @@ public sealed partial class MainViewModel : ObservableObject
         _settings.TemplatePath = TemplatePath;
         _settings.DrawingTemplatePath = DrawingTemplatePath;
         _settings.PowderPartPath = PowderPartPath;
+        _settings.PowderQuantityCsvPath = PowderQuantityCsvPath;
         _settings.OutputFolder = OutputFolder;
         _settings.UseCustomOutputFolder = UseCustomOutputFolder;
 

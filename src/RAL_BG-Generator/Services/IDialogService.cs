@@ -13,6 +13,9 @@ public interface IDialogService
     /// <summary>OpenFileDialog fuer die Pulverdatei (*.par).</summary>
     string? PickPowderPart(string? currentPath);
 
+    /// <summary>OpenFileDialog fuer die Mengen-CSV der Pulverdatei (*.csv).</summary>
+    string? PickPowderQuantityCsv(string? currentPath);
+
     /// <summary>OpenFileDialog mit Mehrfachauswahl fuer Teiledateien (*.psm, *.par).</summary>
     IReadOnlyList<string> PickPartFiles(string? initialFolder);
 

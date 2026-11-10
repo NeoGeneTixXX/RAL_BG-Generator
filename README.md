@@ -62,6 +62,11 @@ Ergebnis: `publish\RAL_BG-Generator.exe` (ca. 150 MB, keine Runtime-Installation
    größer 0: Komma, Punkt, Vorzeichen, Buchstaben und Leerzeichen lassen sich weder tippen
    noch einfügen; ein leeres Feld oder 0 sperrt den Start. Ohne Pulverdatei ist das Feld
    ausgegraut.
+   **Ab zwei Dateien in der Liste** ist das Mengenfeld ausgegraut; dann muss eine
+   **Mengen-CSV** gewählt werden (siehe unten). Sie wird gespeichert, bei jeder Änderung der
+   Dateiliste und direkt vor dem Lauf neu gelesen und gegen die Liste geprüft. Fehlt eine
+   Datei oder ist eine Menge ungültig, bleibt der Start gesperrt und der Statustext nennt die
+   betroffenen Dateien.
 4. **Farbe wählen** — die Face Styles werden aus der Vorlage gelesen. Das Suchfeld filtert die
    Liste (Vorlagen enthalten oft über 100 Styles).
 5. **Teile wählen** — Mehrfachauswahl per Dialog oder Drag and Drop ins Fenster.
@@ -76,6 +81,26 @@ Ergebnis: `publish\RAL_BG-Generator.exe` (ca. 150 MB, keine Runtime-Installation
    sie ab, werden Maßstab und Lage korrigiert. Unmittelbar vor dem Speichern werden alle
    Ansichten auf allen Blättern geprüft und veraltete aktualisiert. Erst dann wird die
    Zeichnung gespeichert und sofort geschlossen.
+
+### Mengen-CSV
+
+Spalte 1 = Dateiname, Spalte 2 = Menge der Pulverdatei:
+
+```
+Datei;Menge
+Halter-01.psm;3
+Halter-02;12
+```
+
+| Regel | |
+|---|---|
+| Trennzeichen | Semikolon (Excel-Standard auf deutschen Systemen); Tab und Komma werden ebenfalls erkannt |
+| Kopfzeile | optional — die erste Zeile wird übersprungen, wenn in Spalte 2 keine Zahl steht |
+| Dateiname | mit oder ohne Endung, ohne Ordner, Groß-/Kleinschreibung egal; mit Endung hat Vorrang |
+| Menge | ganze Zahl größer 0 — `3,0`, `0`, `-1` oder Text sind Fehler (mit Zeilennummer) |
+| Zusätzliche Zeilen | Dateien, die nicht in der Liste stehen, werden ignoriert |
+| Doppelte Dateinamen | Fehler, Start gesperrt |
+| Kodierung | UTF-8 (mit oder ohne BOM) oder ANSI, wie Excel speichert |
 
 ### Namensregel
 
@@ -115,6 +140,7 @@ src/RAL_BG-Generator/
 │   ├── SettingsService.cs  appsettings.json im AppData-Ordner
 │   ├── DocumentValidator   prüft Vorlage und Pulverdatei, ohne Solid Edge zu starten
 │   ├── OutputNameBuilder   Zieldateiname (Quellname + .asm)
+│   ├── PowderQuantityCsv   liest und prüft die Mengen-CSV der Pulverdatei
 │   └── DialogService.cs    Datei-/Ordnerdialoge, Überschreiben-Abfrage
 ├── ViewModels/             MainViewModel: Zustand, Kommandos, Batch-Ablauf
 ├── Views/                  MainWindow, OverwriteDialog

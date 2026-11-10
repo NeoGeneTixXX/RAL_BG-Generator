@@ -24,6 +24,12 @@ public sealed class AppSettings
     /// <summary>Stuecklistenmenge der Pulverdatei je Baugruppe; ganze Zahl groesser 0.</summary>
     public int PowderQuantity { get; set; } = 1;
 
+    /// <summary>
+    /// Mengen-CSV (Dateiname;Menge). Gilt statt <see cref="PowderQuantity"/>, sobald mehr
+    /// als eine Datei in der Liste steht.
+    /// </summary>
+    public string? PowderQuantityCsvPath { get; set; }
+
     /// <summary>Abweichender Zielordner; leer = Ordner der jeweiligen Quelldatei.</summary>
     public string? OutputFolder { get; set; }
 

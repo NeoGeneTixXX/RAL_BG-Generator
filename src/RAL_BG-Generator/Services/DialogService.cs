@@ -57,6 +57,21 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
+    public string? PickPowderQuantityCsv(string? currentPath)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Mengen-CSV fuer die Pulverdatei auswaehlen",
+            Filter = "CSV-Datei (*.csv)|*.csv|Textdatei (*.txt)|*.txt|Alle Dateien (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        ApplyInitialLocation(dialog, currentPath);
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
     public IReadOnlyList<string> PickPartFiles(string? initialFolder)
     {
         var dialog = new OpenFileDialog

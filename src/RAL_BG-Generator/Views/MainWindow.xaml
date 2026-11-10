@@ -136,6 +136,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -181,13 +183,18 @@
                          HorizontalContentAlignment="Right"
                          VerticalContentAlignment="Center"
                          Padding="4,3"
-                         ToolTip="Stuecklistenmenge der Pulverdatei je Baugruppe - ganze Zahl groesser 0">
+                         ToolTipService.ShowOnDisabled="True"
+                         ToolTip="Stuecklistenmenge der Pulverdatei je Baugruppe - ganze Zahl groesser 0. Bei mehr als einer Datei gilt die Mengen-CSV.">
                     <TextBox.Style>
                         <Style TargetType="TextBox">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsPowderQuantityValid}" Value="False">
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding UsesPowderQuantityCsv}" Value="False" />
+                                        <Condition Binding="{Binding IsPowderQuantityValid}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
                                     <Setter Property="BorderBrush" Value="#C42020" />
-                                </DataTrigger>
+                                </MultiDataTrigger>
                             </Style.Triggers>
                         </Style>
                     </TextBox.Style>
@@ -220,7 +227,71 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsPowderQuantityValid}" Value="True">
+                                <DataTrigger Binding="{Binding PowderQuantityStatus}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Mengen-CSV: gilt statt des Mengenfelds, sobald mehr als eine Datei in der Liste steht. -->
+                <Grid Grid.Row="3" Grid.ColumnSpan="5" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Mengen-CSV:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0" />
+
+                    <TextBox Grid.Column="1"
+                             Text="{Binding PowderQuantityCsvPath, UpdateSourceTrigger=PropertyChanged}"
+                             IsReadOnly="True"
+                             IsEnabled="{Binding CanEditPowderQuantityCsv}"
+                             VerticalContentAlignment="Center"
+                             Padding="4,3"
+                             ToolTipService.ShowOnDisabled="True"
+                             ToolTip="Ab zwei Dateien in der Liste: CSV mit Spalte 1 = Dateiname, Spalte 2 = Menge (z. B. Halter-01;3)" />
+
+                    <Button Grid.Column="2"
+                            Content="Durchsuchen..."
+                            Margin="8,0,0,0"
+                            Command="{Binding BrowsePowderQuantityCsvCommand}" />
+
+                    <Button Grid.Column="3"
+                            Content="Entfernen"
+                            Margin="8,0,0,0"
+                            Command="{Binding ClearPowderQuantityCsvCommand}" />
+                </Grid>
+
+                <TextBlock Grid.Row="4" Grid.ColumnSpan="5"
+                           Text="{Binding PowderQuantityCsvStatus}"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#6E6E6E" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding UsesPowderQuantityCsv}" Value="True" />
+                                        <Condition Binding="{Binding IsPowderQuantityValid}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Foreground" Value="#107C10" />
+                                </MultiDataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding UsesPowderQuantityCsv}" Value="True" />
+                                        <Condition Binding="{Binding IsPowderQuantityValid}" Value="False" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Foreground" Value="#C42020" />
+                                </MultiDataTrigger>
+                                <DataTrigger Binding="{Binding PowderQuantityCsvStatus}" Value="">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                             </Style.Triggers>
