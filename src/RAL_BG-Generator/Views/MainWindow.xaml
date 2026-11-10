@@ -1,0 +1,320 @@
+<Window x:Class="RalBgGenerator.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:RalBgGenerator.ViewModels"
+        d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="RAL_BG-Generator"
+        Height="900"
+        Width="980"
+        MinHeight="760"
+        MinWidth="820"
+        AllowDrop="True"
+        Drop="OnFilesDropped"
+        DragOver="OnDragOver"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <!-- Vorlage -->
+            <RowDefinition Height="Auto" />
+            <!-- Zeichnungsvorlage -->
+            <RowDefinition Height="Auto" />
+            <!-- Pulverdatei -->
+            <RowDefinition Height="Auto" />
+            <!-- Farbe -->
+            <RowDefinition Height="Auto" />
+            <!-- Dateien: Kopfzeile -->
+            <RowDefinition Height="2*" MinHeight="140" />
+            <!-- Dateiliste -->
+            <RowDefinition Height="Auto" />
+            <!-- Zielordner -->
+            <RowDefinition Height="Auto" />
+            <!-- Aktionen + Fortschritt -->
+            <RowDefinition Height="3*" MinHeight="120" />
+            <!-- Log -->
+        </Grid.RowDefinitions>
+
+        <!-- ============================================ Vorlagebaugruppe -->
+        <GroupBox Grid.Row="0" Header="Vorlagebaugruppe" Padding="10,8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Row="0" Grid.Column="0"
+                         Text="{Binding TemplatePath, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="True"
+                         VerticalContentAlignment="Center"
+                         Padding="4,3"
+                         ToolTip="{Binding TemplatePath}" />
+
+                <Button Grid.Row="0" Grid.Column="1"
+                        Content="Durchsuchen..."
+                        Margin="8,0,0,0"
+                        Command="{Binding BrowseTemplateCommand}" />
+
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                           Text="{Binding TemplateStatus}"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#C42020" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTemplateValid}" Value="True">
+                                    <Setter Property="Foreground" Value="#107C10" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsTemplateWarning}" Value="True">
+                                    <Setter Property="Foreground" Value="#C05A00" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============================================ Zeichnungsvorlage -->
+        <GroupBox Grid.Row="1" Header="Zeichnungsvorlage (.dft)" Padding="10,8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Row="0" Grid.Column="0"
+                         Text="{Binding DrawingTemplatePath, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="True"
+                         VerticalContentAlignment="Center"
+                         Padding="4,3"
+                         ToolTip="{Binding DrawingTemplatePath}" />
+
+                <Button Grid.Row="0" Grid.Column="1"
+                        Content="Durchsuchen..."
+                        Margin="8,0,0,0"
+                        Command="{Binding BrowseDrawingTemplateCommand}"
+                        ToolTip="Zu jeder Baugruppe entsteht daraus eine Zeichnung; die Verknüpfung der Vorlage wird auf die Baugruppe umgestellt" />
+
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                           Text="{Binding DrawingTemplateStatus}"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#C42020" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDrawingTemplateValid}" Value="True">
+                                    <Setter Property="Foreground" Value="#107C10" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsDrawingTemplateWarning}" Value="True">
+                                    <Setter Property="Foreground" Value="#C05A00" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============================================ Pulverdatei -->
+        <GroupBox Grid.Row="2" Header="Pulverdatei (.par, optional)" Padding="10,8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Row="0" Grid.Column="0"
+                         Text="{Binding PowderPartPath, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="True"
+                         VerticalContentAlignment="Center"
+                         Padding="4,3"
+                         ToolTip="{Binding PowderPartPath}" />
+
+                <Button Grid.Row="0" Grid.Column="1"
+                        Content="Durchsuchen..."
+                        Margin="8,0,0,0"
+                        Command="{Binding BrowsePowderPartCommand}"
+                        ToolTip="Wird jeder erzeugten Baugruppe am Ursprung fixiert beigelegt" />
+
+                <Button Grid.Row="0" Grid.Column="2"
+                        Content="Entfernen"
+                        Margin="8,0,0,0"
+                        Command="{Binding ClearPowderPartCommand}" />
+
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="3"
+                           Text="{Binding PowderStatus}"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#C42020" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsPowderValid}" Value="True">
+                                    <Setter Property="Foreground" Value="#107C10" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPowderWarning}" Value="True">
+                                    <Setter Property="Foreground" Value="#C05A00" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </GroupBox>
+
+        <!-- ============================================ Farbe -->
+        <GroupBox Grid.Row="3" Header="Farbe (Face Style aus der Vorlage)" Padding="10,8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Suchen:" VerticalAlignment="Center" Margin="0,0,6,0" />
+
+                <TextBox Grid.Column="1"
+                         Text="{Binding FaceStyleFilter, UpdateSourceTrigger=PropertyChanged, Delay=150}"
+                         VerticalContentAlignment="Center"
+                         Padding="4,3"
+                         ToolTip="Filtert die Farbliste, z. B. 'RAL 50'" />
+
+                <ComboBox Grid.Column="2"
+                          Margin="8,0,0,0"
+                          ItemsSource="{Binding FaceStyles}"
+                          SelectedItem="{Binding SelectedFaceStyle}"
+                          IsEnabled="{Binding IsTemplateValid}"
+                          VerticalContentAlignment="Center" />
+
+                <Button Grid.Column="3"
+                        Content="Farben laden"
+                        Margin="8,0,0,0"
+                        Command="{Binding ReloadFaceStylesCommand}"
+                        ToolTip="Liest die Face Styles erneut aus der Vorlage (startet Solid Edge, falls noetig)" />
+            </Grid>
+        </GroupBox>
+
+        <!-- ============================================ Dateien -->
+        <Grid Grid.Row="4" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       FontWeight="SemiBold"
+                       Text="Teiledateien (.psm / .par) - Dateien koennen auch per Drag and Drop abgelegt werden" />
+
+            <Button Grid.Column="1" Content="Dateien auswaehlen..." Command="{Binding AddFilesCommand}" />
+            <Button Grid.Column="2" Content="Entfernen" Margin="8,0,0,0"
+                    Command="{Binding RemoveFileCommand}"
+                    CommandParameter="{Binding SelectedPartFile}" />
+            <Button Grid.Column="3" Content="Liste leeren" Margin="8,0,0,0" Command="{Binding ClearFilesCommand}" />
+        </Grid>
+
+        <ListView Grid.Row="5"
+                  ItemsSource="{Binding PartFiles}"
+                  SelectedItem="{Binding SelectedPartFile}"
+                  Margin="0,0,0,10">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Datei" Width="230" DisplayMemberBinding="{Binding FileName}" />
+                    <GridViewColumn Header="Ordner" Width="330" DisplayMemberBinding="{Binding DirectoryName}" />
+                    <GridViewColumn Header="Zieldatei" Width="290" DisplayMemberBinding="{Binding TargetPreview}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- ============================================ Zielordner -->
+        <GroupBox Grid.Row="6" Header="Ziel" Padding="10,8" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <CheckBox Grid.Column="0"
+                          Content="Eigener Zielordner"
+                          VerticalAlignment="Center"
+                          Margin="0,0,10,0"
+                          IsChecked="{Binding UseCustomOutputFolder}"
+                          ToolTip="Ohne Haken wird neben der jeweiligen Quelldatei gespeichert" />
+
+                <TextBox Grid.Column="1"
+                         Text="{Binding OutputFolder, UpdateSourceTrigger=PropertyChanged}"
+                         IsEnabled="{Binding UseCustomOutputFolder}"
+                         VerticalContentAlignment="Center"
+                         Padding="4,3" />
+
+                <Button Grid.Column="2"
+                        Content="Durchsuchen..."
+                        Margin="8,0,0,0"
+                        Command="{Binding BrowseOutputFolderCommand}" />
+            </Grid>
+        </GroupBox>
+
+        <!-- ============================================ Aktionen -->
+        <Grid Grid.Row="7" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" Content="Start" MinWidth="120" Padding="12,6"
+                    FontWeight="SemiBold" Command="{Binding StartCommand}" />
+
+            <Button Grid.Column="1" Content="Abbrechen" MinWidth="120" Padding="12,6" Margin="8,0,0,0"
+                    Command="{Binding CancelCommand}" />
+
+            <ProgressBar Grid.Column="2" Height="20" Margin="16,0,10,0"
+                         Minimum="0"
+                         Maximum="{Binding ProgressMaximum}"
+                         Value="{Binding ProgressValue}" />
+
+            <TextBlock Grid.Column="3" VerticalAlignment="Center" MinWidth="80"
+                       Text="{Binding ProgressText}" />
+        </Grid>
+
+        <!-- ============================================ Log -->
+        <GroupBox Grid.Row="8" Header="Protokoll" Padding="4">
+            <ListBox x:Name="LogList"
+                     ItemsSource="{Binding Log}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     FontFamily="Consolas">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Display}"
+                                   Foreground="{Binding Level, Converter={StaticResource LogLevelToBrush}}"
+                                   TextWrapping="Wrap" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </GroupBox>
+    </Grid>
+</Window>
