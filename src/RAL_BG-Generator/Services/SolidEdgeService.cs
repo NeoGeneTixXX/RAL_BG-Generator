@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.CSharp.RuntimeBinder;
@@ -438,36 +439,87 @@ public sealed class SolidEdgeService : ISolidEdgeService
     }
 
     /// <summary>
-    /// Setzt die normale Stuecklistenmenge (Occurrence.Quantity, Int32) und liest sie zur
-    /// Kontrolle zurueck. Weicht sie ab, wird die Baugruppe nicht gespeichert.
+    /// Setzt die Stuecklistenmenge und liest sie zur Kontrolle zurueck. Weicht sie ab, wird
+    /// die Baugruppe nicht gespeichert.
+    /// Nichtgrafische Teile (HasNongraphicQuantity = true, z. B. die Pulverdatei ohne
+    /// Geometrie) lehnen Occurrence.Quantity mit E_FAIL ab - in Solid Edge 2026 getestet.
+    /// Fuer sie gilt Occurrence.NongraphicQuantity (Double); gesetzt wird trotzdem nur die
+    /// ganze Zahl aus dem Mengenfeld.
     /// </summary>
-    private static void SetQuantity(dynamic occurrence, int quantity)
+    private void SetQuantity(dynamic occurrence, int quantity)
+    {
+        var isNongraphic = IsNongraphic(occurrence);
+        var propertyName = isNongraphic ? "NongraphicQuantity" : "Quantity";
+
+        try
+        {
+            if (isNongraphic)
+            {
+                ComRetry.Execute(() => { occurrence.NongraphicQuantity = (double)quantity; });
+            }
+            else
+            {
+                ComRetry.Execute(() => { occurrence.Quantity = quantity; });
+            }
+        }
+        catch (Exception ex) when (ComErrors.IsComFailure(ex))
+        {
+            throw new SolidEdgeException(
+                "Die Menge der Pulverdatei liess sich nicht auf " + quantity + " setzen (" + propertyName +
+                ", " + DescribeComError(ex) + ").",
+                ex);
+        }
+
+        double actual;
+
+        try
+        {
+            actual = isNongraphic
+                ? ComRetry.Execute(() => (double)occurrence.NongraphicQuantity)
+                : ComRetry.Execute(() => (int)occurrence.Quantity);
+        }
+        catch (Exception ex) when (ComErrors.IsComFailure(ex))
+        {
+            throw new SolidEdgeException(
+                "Die Menge der Pulverdatei liess sich nicht zuruecklesen (" + propertyName + ", " +
+                DescribeComError(ex) + ").",
+                ex);
+        }
+
+        if (Math.Abs(actual - quantity) > 1e-9)
+        {
+            throw new SolidEdgeException(
+                "Die Menge der Pulverdatei ist " + actual.ToString(CultureInfo.InvariantCulture) +
+                " statt " + quantity + " (" + propertyName + ").");
+        }
+
+        DiagnosticLog?.Invoke(
+            "Menge der Pulverdatei: " + quantity + (isNongraphic ? " (nichtgrafische Menge)" : string.Empty));
+    }
+
+    private static bool IsNongraphic(dynamic occurrence)
     {
         try
         {
-            ComRetry.Execute(() => { occurrence.Quantity = quantity; });
+            return ComRetry.Execute(() => (bool)occurrence.HasNongraphicQuantity);
         }
         catch (Exception ex) when (ComErrors.IsComFailure(ex))
         {
-            throw new SolidEdgeException("Die Menge der Pulverdatei liess sich nicht auf " + quantity + " setzen.", ex);
+            return false;
+        }
+    }
+
+    /// <summary>HRESULT der innersten Ausnahme, z. B. "0x80004005" - fuer die Fehlersuche.</summary>
+    private static string DescribeComError(Exception exception)
+    {
+        var inner = exception;
+
+        while (inner.InnerException is not null)
+        {
+            inner = inner.InnerException;
         }
 
-        int actual;
-
-        try
-        {
-            actual = ComRetry.Execute(() => (int)occurrence.Quantity);
-        }
-        catch (Exception ex) when (ComErrors.IsComFailure(ex))
-        {
-            throw new SolidEdgeException("Die Menge der Pulverdatei liess sich nicht zuruecklesen.", ex);
-        }
-
-        if (actual != quantity)
-        {
-            throw new SolidEdgeException(
-                "Die Menge der Pulverdatei ist " + actual + " statt " + quantity + ".");
-        }
+        return "0x" + inner.HResult.ToString("X8", CultureInfo.InvariantCulture);
     }
 
     /// <summary>

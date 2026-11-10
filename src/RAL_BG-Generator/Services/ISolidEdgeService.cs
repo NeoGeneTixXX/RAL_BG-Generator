@@ -34,7 +34,8 @@ public interface ISolidEdgeService : IDisposable
     /// Sie bekommt keinen Face Style; null/leer = keine Pulverdatei.
     /// </param>
     /// <param name="powderQuantity">
-    /// Stuecklistenmenge der Pulverdatei (Occurrence.Quantity), ganze Zahl groesser 0.
+    /// Stuecklistenmenge der Pulverdatei, ganze Zahl groesser 0. Gesetzt als
+    /// Occurrence.NongraphicQuantity bei nichtgrafischen Teilen, sonst Occurrence.Quantity.
     /// Ohne Pulverdatei ohne Wirkung.
     /// </param>
     Task CreateAssemblyAsync(
